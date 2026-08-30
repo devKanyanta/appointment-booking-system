@@ -1,0 +1,19 @@
+{
+  "name": "kairos-schedule",
+  "version": "1.0.0",
+  "description": "Web-based appointment booking system for beauty services",
+  "private": true,
+  "scripts": {
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "migrate": "cd server && npx sequelize-cli db:migrate",
+    "seed": "cd server && npx sequelize-cli db:seed:all",
+    "test": "cd server && npm test",
+    "build": "cd client && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
