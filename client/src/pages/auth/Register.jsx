@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Button } from '../../components/ui/button';
@@ -21,6 +21,7 @@ export default function Register() {
   const { register } = useAuth();
   const { error: showError, success: showSuccess } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -48,7 +49,8 @@ export default function Register() {
         consent: 'true',
       });
       showSuccess('Account created successfully!');
-      navigate('/dashboard');
+      const destination = location.state?.from;
+      navigate(destination ? `${destination.pathname}${destination.search || ''}` : '/dashboard', { replace: true });
     } catch (err) {
       showError(err.message || 'Registration failed');
     } finally {

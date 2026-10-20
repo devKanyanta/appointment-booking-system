@@ -18,6 +18,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     api.get('/admin/dashboard')
       .then((res) => setStats(res.data.stats))
+      .catch(() => setStats(null))
       .finally(() => setLoading(false));
   }, []);
 
@@ -92,7 +93,7 @@ export default function AdminDashboard() {
                 {stats.popularServices.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center">
                     <span className="text-sm">{item.service?.name || 'Unknown'}</span>
-                    <span className="text-sm font-medium">{item.dataValues?.count || 0} bookings</span>
+                    <span className="text-sm font-medium">{item.count ?? item.dataValues?.count ?? 0} bookings</span>
                   </div>
                 ))}
               </div>

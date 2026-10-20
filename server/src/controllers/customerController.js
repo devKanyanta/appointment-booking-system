@@ -1,6 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { User, Service, Appointment } = require('../models');
-const { Op } = require('sequelize');
+const { Service, Appointment } = require('../models');
 
 const updateProfile = async (req, res, next) => {
   try {
@@ -48,8 +47,6 @@ const deleteAccount = async (req, res, next) => {
 
 const getAppointments = async (req, res, next) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-
     const appointments = await Appointment.findAll({
       where: {
         customer_id: req.user.id,

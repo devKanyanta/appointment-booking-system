@@ -3,18 +3,18 @@ require('dotenv').config();
 module.exports = {
   development: {
     username: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'your_password',
+    password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'kairos_schedule',
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_SOCKET_PATH || process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     dialect: 'postgres',
     logging: false,
   },
   test: {
     username: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'your_password',
+    password: process.env.DB_PASSWORD || '',
     database: `${process.env.DB_NAME || 'kairos_schedule'}_test`,
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_SOCKET_PATH || process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     dialect: 'postgres',
     logging: false,

@@ -116,11 +116,19 @@ const getWorkingHours = async (req, res, next) => {
 
 const updateWorkingHours = async (req, res, next) => {
   try {
-    const { hours } = req.body; // Array of { dayOfWeek, openTime, closeTime, isActive }
+    const hours = req.body.hours || (req.body.workingHours || []).map((h) => ({
+      dayOfWeek: h.day_of_week,
+      openTime: h.open_time,
+      closeTime: h.close_time,
+      isActive: h.is_active !== undefined ? h.is_active : true,
+    }));
+    if (!hours.length || hours.some((h) => !Number.isInteger(Number(h.dayOfWeek)) || Number(h.dayOfWeek) < 0 || Number(h.dayOfWeek) > 6 || !/^\d{2}:\d{2}(:\d{2})?$/.test(h.openTime || '') || !/^\d{2}:\d{2}(:\d{2})?$/.test(h.closeTime || ''))) {
+      return res.status(400).json({ message: 'Provide valid working hours for each selected weekday' });
+    }
 
     for (const h of hours) {
       await WorkingHours.upsert({
-        day_of_week: h.dayOfWeek,
+        day_of_week: Number(h.dayOfWeek),
         open_time: h.openTime,
         close_time: h.closeTime,
         is_active: h.isActive,
@@ -128,7 +136,7 @@ const updateWorkingHours = async (req, res, next) => {
     }
 
     const updated = await WorkingHours.findAll({ order: [['day_of_week', 'ASC']] });
-    res.json({ success: true, message: 'Working hours updated', data: updated });
+    res.json({ success: true, message: 'Working hours updated', data: updated, workingHours: updated });
   } catch (error) {
     next(error);
   }
@@ -151,7 +159,7 @@ const getBlockedPeriods = async (req, res, next) => {
       where,
       order: [['date', 'ASC']],
     });
-    res.json({ blockedPeriods: periods });
+    res.json({ blockedPeriods: periods, data: periods });
   } catch (error) {
     next(error);
   }
@@ -160,6 +168,9 @@ const getBlockedPeriods = async (req, res, next) => {
 const createBlockedPeriod = async (req, res, next) => {
   try {
     const { date, startTime, endTime, reason } = req.body;
+    if ((startTime && !endTime) || (!startTime && endTime) || (startTime && endTime && startTime >= endTime)) {
+      return res.status(400).json({ message: 'Provide both block times and ensure the end is after the start' });
+    }
     const period = await BlockedPeriod.create({
       date,
       start_time: startTime || null,
@@ -215,7 +226,10 @@ const getCustomerById = async (req, res, next) => {
       order: [['date', 'DESC'], ['start_time', 'DESC']],
     });
 
-    res.json({ data: customer });
+    res.json({
+      data: { ...customer.toJSON(), appointments },
+      appointments,
+    });
   } catch (error) {
     next(error);
   }
@@ -249,9 +263,10 @@ const anonymizeCustomer = async (req, res, next) => {
 
 const getDashboardStats = async (req, res, next) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = localDateString(new Date());
+    const weekAgoDate = new Date();
+    weekAgoDate.setDate(weekAgoDate.getDate() - 7);
+    const weekAgo = localDateString(weekAgoDate);
 
     const [
       totalAppointments,
@@ -273,9 +288,9 @@ const getDashboardStats = async (req, res, next) => {
           'service_id',
           [require('sequelize').fn('COUNT', require('sequelize').col('Appointment.id')), 'count'],
         ],
-        include: [{ model: Service, as: 'service', attributes: ['name'] }],
-        group: ['service_id', 'Service.id', 'Service.name'],
-        order: [[require('sequelize').literal('count'), 'DESC']],
+        include: [{ model: Service, as: 'service', attributes: ['name'], required: true }],
+        group: ['Appointment.service_id', 'service.id', 'service.name'],
+        order: [[require('sequelize').literal('"count"'), 'DESC']],
         limit: 5,
       }),
     ]);
@@ -299,6 +314,10 @@ const getDashboardStats = async (req, res, next) => {
     next(error);
   }
 };
+
+function localDateString(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
 module.exports = {
   getAppointments,

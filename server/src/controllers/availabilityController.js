@@ -15,7 +15,11 @@ const getAvailability = async (req, res, next) => {
     }
 
     // Validate date is not in the past
-    const requestedDate = new Date(date);
+    const [year, month, day] = date.split('-').map(Number);
+    const requestedDate = new Date(year, month - 1, day);
+    if (requestedDate.getFullYear() !== year || requestedDate.getMonth() !== month - 1 || requestedDate.getDate() !== day) {
+      return res.status(400).json({ message: 'Invalid calendar date' });
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (requestedDate < today) {

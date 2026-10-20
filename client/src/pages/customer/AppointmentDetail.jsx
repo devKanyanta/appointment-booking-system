@@ -26,11 +26,11 @@ export default function AppointmentDetail() {
   const loadAppointment = async () => {
     try {
       const res = await api.get(`/appointments/upcoming`);
-      const apt = res.data.appointments.find((a) => a.id === parseInt(id));
+      const apt = res.data.data.find((a) => a.id === parseInt(id));
       if (!apt) {
         // Try from history
         const histRes = await api.get(`/appointments/history`);
-        const histApt = histRes.data.appointments.find((a) => a.id === parseInt(id));
+        const histApt = histRes.data.data.find((a) => a.id === parseInt(id));
         setAppointment(histApt || null);
       } else {
         setAppointment(apt);
@@ -110,7 +110,7 @@ export default function AppointmentDetail() {
               >
                 Cancel Appointment
               </Button>
-              <Link to={`/dashboard/book?service=${appointment.service_id}`}>
+              <Link to={`/dashboard/book?service=${appointment.service_id}&reschedule=${appointment.id}`}>
                 <Button variant="outline">Reschedule</Button>
               </Link>
             </div>
@@ -120,6 +120,11 @@ export default function AppointmentDetail() {
             <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
               This appointment cannot be cancelled — it is less than 6 hours away.
             </p>
+          )}
+          {appointment.status === 'booked' && hoursUntil < 6 && hoursUntil >= 0 && (
+            <Link to={`/dashboard/book?service=${appointment.service_id}&reschedule=${appointment.id}`}>
+              <Button variant="outline">Reschedule</Button>
+            </Link>
           )}
         </CardContent>
       </Card>

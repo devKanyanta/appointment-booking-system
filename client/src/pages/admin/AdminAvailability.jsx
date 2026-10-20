@@ -29,8 +29,8 @@ export default function AdminAvailability() {
   const loadData = async () => {
     try {
       const [hoursRes, blocksRes] = await Promise.all([
-        api.get('/admin/working-hours'),
-        api.get('/admin/blocked-periods'),
+        api.get('/admin/availability/working-hours'),
+        api.get('/admin/availability/blocked-periods'),
       ]);
       setWorkingHours(hoursRes.data.workingHours);
       setBlockedPeriods(blocksRes.data.blockedPeriods);
@@ -53,12 +53,13 @@ export default function AdminAvailability() {
     setSaving(true);
     try {
       const hours = workingHours.map((h) => ({
-        dayOfWeek: h.day_of_week,
-        openTime: h.open_time,
-        closeTime: h.close_time,
-        isActive: h.is_active,
+        day_of_week: h.day_of_week,
+        open_time: h.open_time,
+        close_time: h.close_time,
+        is_active: h.is_active,
       }));
-      await api.put('/admin/working-hours', { hours });
+      const res = await api.put('/admin/availability/working-hours', { workingHours: hours });
+      setWorkingHours(res.data.data);
       success('Working hours updated');
     } catch (err) {
       showError(err.message || 'Failed to save working hours');
@@ -70,7 +71,7 @@ export default function AdminAvailability() {
   const handleAddBlock = async () => {
     if (!newBlock.date) return showError('Date is required');
     try {
-      await api.post('/admin/blocked-periods', {
+      await api.post('/admin/availability/blocked-periods', {
         date: newBlock.date,
         startTime: newBlock.startTime || null,
         endTime: newBlock.endTime || null,
@@ -78,7 +79,7 @@ export default function AdminAvailability() {
       });
       success('Period blocked');
       setNewBlock({ date: '', startTime: '', endTime: '', reason: '' });
-      loadData();
+      await loadData();
     } catch (err) {
       showError(err.message || 'Failed to block period');
     }
@@ -86,9 +87,9 @@ export default function AdminAvailability() {
 
   const handleDeleteBlock = async (id) => {
     try {
-      await api.delete(`/admin/blocked-periods/${id}`);
+      await api.delete(`/admin/availability/blocked-periods/${id}`);
       success('Blocked period removed');
-      loadData();
+      await loadData();
     } catch (err) {
       showError(err.message || 'Failed to remove blocked period');
     }

@@ -13,7 +13,8 @@ export default function BookingHistory() {
 
   useEffect(() => {
     api.get('/appointments/history')
-      .then((res) => setAppointments(res.data.appointments))
+      .then((res) => setAppointments(res.data.data))
+      .catch(() => setAppointments([]))
       .finally(() => setLoading(false));
   }, []);
 

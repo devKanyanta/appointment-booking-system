@@ -4,12 +4,12 @@ require('dotenv').config();
 const sequelize = new Sequelize(
   process.env.DB_NAME || 'kairos_schedule',
   process.env.DB_USER || 'postgres',
-  process.env.DB_PASSWORD || 'your_password',
+  process.env.DB_PASSWORD || '',
   {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_SOCKET_PATH || process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     dialect: 'postgres',
-    logging: process.env.NODE_ENV === 'development' ? false : false,
+    logging: false,
     pool: {
       max: 10,
       min: 0,

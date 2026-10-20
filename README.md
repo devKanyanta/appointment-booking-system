@@ -13,52 +13,53 @@ A web-based appointment booking and management system for a school-based beauty 
 
 ## Prerequisites
 
-- Node.js 18+
-- PostgreSQL 14+
-- npm
+- Node.js 18+ and npm
+- PostgreSQL 14+ (a local PostgreSQL server must be running)
 
-## Setup
+## Run Locally
 
-### 1. Install Dependencies
+The app expects a PostgreSQL database named `kairos_schedule`. In a local PostgreSQL setup, use a development role that can create tables and run the migrations. The defaults use database user `postgres` with no password; configure `server/.env` if your PostgreSQL credentials differ.
 
 ```bash
+# Install the frontend and backend dependencies
 npm run install:all
-```
 
-### 2. Database Setup
+# Apply schema migrations and insert sample data (safe to re-run)
+npm run db:setup
 
-1. Create a PostgreSQL database:
-```sql
-CREATE DATABASE kairos_schedule;
-```
-
-2. Copy environment files and configure:
-```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
-```
-
-3. Edit `server/.env` with your database credentials.
-
-### 3. Run Migrations & Seed
-
-```bash
-npm run migrate
-npm run seed
-```
-
-### 4. Start Development
-
-```bash
+# Start the API and Vite development site
 npm run dev
 ```
 
-This starts both the server (http://localhost:5000) and client (http://localhost:5173).
+Open **http://localhost:5173**. The API health endpoint is **http://localhost:5000/api/health**. Vite proxies `/api` requests to the API.
 
-## Default Admin Account
+Optional `server/.env` settings:
 
-- **Email:** admin@kairos.com
-- **Password:** Admin@123
+```dotenv
+DB_NAME=kairos_schedule
+DB_USER=postgres
+DB_PASSWORD=
+DB_HOST=localhost
+DB_PORT=5432
+JWT_SECRET=replace-with-a-long-random-local-secret
+ADMIN_EMAIL=admin@kairos.com
+ADMIN_PASSWORD=Admin@123
+DEMO_CUSTOMER_EMAIL=customer@kairos.com
+DEMO_CUSTOMER_PASSWORD=Customer@123
+```
+
+The seeder inserts a demo admin, demo customer, eight services, working hours for all seven weekdays (closed Sunday), and two upcoming sample appointments. Existing services/hours are left in place, and existing appointments are not overwritten. The demo appointments use the `Kairos demo seed` note.
+
+## Demo Accounts
+
+- **Admin:** `admin@kairos.com` / `Admin@123` (sign in at `/admin/login`)
+- **Customer:** `customer@kairos.com` / `Customer@123`
+
+These credentials are for local development only. Set a private `ADMIN_PASSWORD`, `DEMO_CUSTOMER_PASSWORD`, and strong `JWT_SECRET` before any non-local deployment.
+
+## Production Frontend
+
+Build the client with `npm run build`; when `client/dist` exists, the Express server serves it as well as the API. In development, run `npm run dev` and browse via Vite on port 5173.
 
 ## API Endpoints
 

@@ -12,7 +12,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { loginAdmin } = useAuth();
   const { error: showError } = useToast();
   const navigate = useNavigate();
 
@@ -20,11 +20,7 @@ export default function AdminLogin() {
     e.preventDefault();
     setLoading(true);
     try {
-      const result = await login(email, password);
-      if (result.user.role !== 'admin') {
-        showError('You do not have administrator access');
-        return;
-      }
+      await loginAdmin(email, password);
       navigate('/admin');
     } catch (err) {
       showError(err.message || 'Login failed');

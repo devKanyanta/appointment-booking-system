@@ -1,4 +1,3 @@
-const { Op } = require('sequelize');
 const { Service, WorkingHours, BlockedPeriod, Appointment } = require('../models');
 
 /**
@@ -13,12 +12,18 @@ const { Service, WorkingHours, BlockedPeriod, Appointment } = require('../models
  * 7. Filter out slots that extend beyond closing, overlap blocks, or overlap bookings
  */
 async function getAvailableSlots(date, serviceId) {
+  if (date instanceof Date) date = formatDateOnly(date);
   const service = await Service.findByPk(serviceId);
   if (!service || !service.is_active) {
     throw new Error('Service not found');
   }
 
-  const appointmentDate = new Date(date);
+  const appointmentDate = parseDateOnly(date);
+  if (Number.isNaN(appointmentDate.getTime()) || formatDateOnly(appointmentDate) !== date) {
+    throw new Error('Invalid appointment date');
+  }
+  const today = formatDateOnly(new Date());
+  if (date < today) return { date, serviceId, serviceDuration: service.duration, slots: [] };
   const dayOfWeek = appointmentDate.getDay();
 
   // Get working hours for this day
@@ -49,8 +54,11 @@ async function getAvailableSlots(date, serviceId) {
   const duration = service.duration;
   const interval = 15; // 15-minute intervals
   const slots = [];
+  const now = new Date();
+  const isToday = date === formatDateOnly(now);
+  const currentTime = now.getHours() * 60 + now.getMinutes();
 
-  let currentMinutes = openTime;
+  let currentMinutes = isToday ? Math.max(openTime, Math.ceil(currentTime / interval) * interval) : openTime;
 
   while (currentMinutes + duration <= closeTime) {
     const slotStart = currentMinutes;
@@ -111,4 +119,15 @@ function formatTime(totalMinutes) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-module.exports = { getAvailableSlots, generateAvailableSlots: getAvailableSlots, parseTime, formatTime };
+function parseDateOnly(value) {
+  if (value instanceof Date) return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  if (typeof value !== 'string') return new Date(Number.NaN);
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDateOnly(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+module.exports = { getAvailableSlots, generateAvailableSlots: getAvailableSlots, parseTime, formatTime, parseDateOnly };

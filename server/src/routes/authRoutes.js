@@ -5,6 +5,9 @@ const { register, login, logout, getMe } = require('../controllers/authControlle
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { User } = require('../models');
+const { jwtSecret } = require('../config/auth');
+
+if (!jwtSecret) throw new Error('JWT_SECRET must be set in production');
 
 const router = express.Router();
 
@@ -46,7 +49,6 @@ router.post('/admin/login',
   async (req, res, next) => {
     try {
       const { email, password } = req.body;
-      const { Op } = require('sequelize');
 
       const user = await User.findOne({ where: { email, role: 'admin' } });
       if (!user || !user.is_active) {

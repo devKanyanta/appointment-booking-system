@@ -13,7 +13,8 @@ export default function ServiceDetail() {
 
   useEffect(() => {
     api.get(`/services/${id}`)
-      .then((res) => setService(res.data.service))
+      .then((res) => setService(res.data.data))
+      .catch(() => setService(null))
       .finally(() => setLoading(false));
   }, [id]);
 

@@ -28,7 +28,7 @@ export default function AdminCustomers() {
   const loadCustomers = async () => {
     try {
       const res = await api.get('/admin/customers');
-      setCustomers(res.data.customers);
+      setCustomers(res.data.data);
     } catch {
       showError('Failed to load customers');
     } finally {
@@ -41,7 +41,7 @@ export default function AdminCustomers() {
     setDetailLoading(true);
     try {
       const res = await api.get(`/admin/customers/${customer.id}`);
-      setCustomerDetail(res.data);
+      setCustomerDetail(res.data.data);
     } catch {
       showError('Failed to load customer details');
     } finally {
@@ -56,7 +56,7 @@ export default function AdminCustomers() {
       setDeleteDialogOpen(false);
       setSelectedCustomer(null);
       setCustomerDetail(null);
-      loadCustomers();
+      await loadCustomers();
     } catch (err) {
       showError(err.message || 'Failed to anonymize customer');
     }
@@ -111,7 +111,7 @@ export default function AdminCustomers() {
                       {customer.is_active ? 'Active' : 'Inactive'}
                     </Badge>
                   </TableCell>
-                  <TableCell>{new Date(customer.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(customer.createdAt || customer.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" onClick={() => viewCustomer(customer)}>
                       <Eye className="h-4 w-4" />
@@ -137,25 +137,25 @@ export default function AdminCustomers() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-gray-500">Name</p>
-                  <p className="font-medium">{customerDetail.customer.name}</p>
+                  <p className="font-medium">{customerDetail.name}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Email</p>
-                  <p className="font-medium">{customerDetail.customer.email}</p>
+                  <p className="font-medium">{customerDetail.email}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Phone</p>
-                  <p className="font-medium">{customerDetail.customer.phone || 'Not provided'}</p>
+                  <p className="font-medium">{customerDetail.phone || 'Not provided'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Joined</p>
-                  <p className="font-medium">{new Date(customerDetail.customer.created_at).toLocaleDateString()}</p>
+                  <p className="font-medium">{new Date(customerDetail.createdAt || customerDetail.created_at).toLocaleDateString()}</p>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-semibold mb-2">Appointment History ({customerDetail.appointments.length})</h4>
-                {customerDetail.appointments.length === 0 ? (
+                <h4 className="font-semibold mb-2">Appointment History ({customerDetail.appointments?.length || 0})</h4>
+                {!customerDetail.appointments?.length ? (
                   <p className="text-sm text-gray-500">No appointments</p>
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto">

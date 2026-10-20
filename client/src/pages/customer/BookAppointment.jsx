@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { formatDate, formatTime, formatCurrency } from '../../lib/utils';
-import { Check, ChevronRight, ArrowLeft, Calendar, Clock } from 'lucide-react';
+import { Check, ArrowLeft, Clock } from 'lucide-react';
 
 export default function BookAppointment() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { success, error: showError } = useToast();
 
+  const rescheduleId = searchParams.get('reschedule');
   const [step, setStep] = useState(1);
   const [services, setServices] = useState([]);
   const [selectedService, setSelectedService] = useState(null);
@@ -28,27 +29,34 @@ export default function BookAppointment() {
   useEffect(() => {
     api.get('/services')
       .then((res) => {
-        setServices(res.data.services);
+        setServices(res.data.data);
         const preselected = searchParams.get('service');
         if (preselected) {
-          const svc = res.data.services.find((s) => s.id === parseInt(preselected));
+          const svc = res.data.data.find((s) => s.id === parseInt(preselected, 10));
           if (svc) {
             setSelectedService(svc);
             setStep(2);
           }
         }
       })
+      .catch(() => setServices([]))
       .finally(() => setLoading(false));
   }, []);
 
   // Load available slots when date is selected
   useEffect(() => {
     if (selectedDate && selectedService) {
+      let cancelled = false;
+      setAvailableSlots([]);
+      setSelectedSlot(null);
       setLoadingSlots(true);
       api.get(`/availability?date=${selectedDate}&serviceId=${selectedService.id}`)
-        .then((res) => setAvailableSlots(res.data.slots))
-        .catch(() => setAvailableSlots([]))
-        .finally(() => setLoadingSlots(false));
+        .then((res) => {
+          if (!cancelled) setAvailableSlots(res.data.data.map((slot) => ({ startTime: slot.start_time, endTime: slot.end_time })));
+        })
+        .catch(() => { if (!cancelled) setAvailableSlots([]); })
+        .finally(() => { if (!cancelled) setLoadingSlots(false); });
+      return () => { cancelled = true; };
     }
   }, [selectedDate, selectedService]);
 
@@ -71,23 +79,26 @@ export default function BookAppointment() {
   const handleConfirm = async () => {
     setBooking(true);
     try {
-      await api.post('/appointments', {
-        serviceId: selectedService.id,
-        date: selectedDate,
-        startTime: selectedSlot.startTime,
-      });
-      success('Appointment booked successfully!');
-      navigate('/dashboard');
+      if (rescheduleId) {
+        await api.put(`/appointments/${rescheduleId}/reschedule`, {
+          date: selectedDate,
+          startTime: selectedSlot.startTime,
+        });
+      } else {
+        await api.post('/appointments', {
+          serviceId: selectedService.id,
+          date: selectedDate,
+          startTime: selectedSlot.startTime,
+        });
+      }
+      success(rescheduleId ? 'Appointment rescheduled successfully!' : 'Appointment booked successfully!');
+      navigate(rescheduleId ? `/dashboard/appointments/${rescheduleId}` : '/dashboard');
     } catch (err) {
       showError(err.message || 'Booking failed');
     } finally {
       setBooking(false);
     }
-  };
-
-  if (loading) return <LoadingSpinner text="Loading services..." />;
-
-  // Generate next 60 days
+  };  // Generate next 60 days
   const today = new Date();
   const maxDate = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
   const dates = [];
@@ -96,6 +107,8 @@ export default function BookAppointment() {
     dates.push(new Date(d));
     d.setDate(d.getDate() + 1);
   }
+
+  if (loading) return <LoadingSpinner text="Loading services..." />;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -141,34 +154,39 @@ export default function BookAppointment() {
               </CardContent>
             </Card>
           ))}
+          {services.length === 0 && <p className="col-span-full text-center text-gray-500">No services are available right now.</p>}
         </div>
       )}
 
       {/* Step 2: Select Date */}
       {step === 2 && (
         <div>
-          <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Change service
-          </Button>
+          {rescheduleId ? (
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/dashboard/appointments/${rescheduleId}`)} className="mb-4">
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back to appointment
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="mb-4">
+              <ArrowLeft className="h-4 w-4 mr-1" /> Change service
+            </Button>
+          )}
           <p className="text-sm text-gray-500 mb-4">
             Selected: <strong>{selectedService?.name}</strong> ({selectedService?.duration} min)
           </p>
           <div className="grid grid-cols-7 gap-2">
             {dates.map((date) => {
-              const dateStr = date.toISOString().split('T')[0];
-              const isSunday = date.getDay() === 0;
-              const isToday = dateStr === today.toISOString().split('T')[0];
+              const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+              const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+              const isToday = dateStr === todayStr;
               return (
                 <button
                   key={dateStr}
-                  disabled={isSunday || dateStr < today.toISOString().split('T')[0]}
+                  disabled={dateStr < todayStr}
                   onClick={() => handleDateSelect(dateStr)}
                   className={`p-2 rounded-lg text-sm text-center transition-colors ${
                     selectedDate === dateStr
                       ? 'bg-primary text-white'
-                      : isSunday
-                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                        : 'bg-white border hover:bg-primary/5 hover:border-primary'
+                      : 'bg-white border hover:bg-primary/5 hover:border-primary'
                   } ${isToday ? 'ring-2 ring-primary ring-offset-1' : ''}`}
                 >
                   <div className="text-xs text-gray-500">
@@ -266,7 +284,7 @@ export default function BookAppointment() {
                 size="lg"
                 disabled={booking}
               >
-                {booking ? 'Booking...' : 'Confirm Booking'}
+                {booking ? (rescheduleId ? 'Rescheduling...' : 'Booking...') : (rescheduleId ? 'Confirm Reschedule' : 'Confirm Booking')}
               </Button>
             </CardContent>
           </Card>

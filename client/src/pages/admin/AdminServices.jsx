@@ -28,7 +28,7 @@ export default function AdminServices() {
   const loadServices = async () => {
     try {
       const res = await api.get('/services/admin/all');
-      setServices(res.data.services);
+      setServices(res.data.data);
     } catch {
       showError('Failed to load services');
     } finally {
@@ -76,7 +76,7 @@ export default function AdminServices() {
       }
 
       setDialogOpen(false);
-      loadServices();
+      await loadServices();
     } catch (err) {
       showError(err.message || 'Failed to save service');
     } finally {
@@ -89,7 +89,7 @@ export default function AdminServices() {
     try {
       await api.delete(`/services/admin/${service.id}`);
       success('Service deactivated');
-      loadServices();
+      await loadServices();
     } catch (err) {
       showError(err.message || 'Failed to delete service');
     }

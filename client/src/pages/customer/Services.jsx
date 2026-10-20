@@ -13,7 +13,8 @@ export default function Services() {
 
   useEffect(() => {
     api.get('/services')
-      .then((res) => setServices(res.data.services))
+      .then((res) => setServices(res.data.data))
+      .catch(() => setServices([]))
       .finally(() => setLoading(false));
   }, []);
 

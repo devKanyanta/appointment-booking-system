@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/connection');
-const { Appointment, Service, User } = require('../models');
-const { parseTime, formatTime } = require('./availabilityEngine');
+const { Appointment, Service, User, WorkingHours, BlockedPeriod } = require('../models');
+const { parseTime, formatTime, parseDateOnly } = require('./availabilityEngine');
 
 const CANCELLATION_HOURS = 6;
 
@@ -10,6 +10,8 @@ const CANCELLATION_HOURS = 6;
  * Uses a database transaction with row-level locking.
  */
 async function createAppointment(customerId, serviceId, date, startTime) {
+  validateDate(date, { allowPast: true });
+  validateTime(startTime);
   const service = await Service.findByPk(serviceId);
   if (!service || !service.is_active) {
     throw Object.assign(new Error('Service not found'), { statusCode: 404 });
@@ -18,10 +20,25 @@ async function createAppointment(customerId, serviceId, date, startTime) {
   const startMinutes = parseTime(startTime);
   const endMinutes = startMinutes + service.duration;
   const endTime = formatTime(endMinutes);
+  await validateSlot(date, startMinutes, endMinutes);
 
   const result = await sequelize.transaction(
     { isolationLevel: 'SERIALIZABLE' },
     async (t) => {
+      const dayLock = await WorkingHours.findOne({
+        where: { day_of_week: parseDateOnly(date).getDay() },
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      if (!dayLock || !dayLock.is_active) {
+        throw Object.assign(new Error('The business is closed on the selected date'), { statusCode: 400 });
+      }
+
+      const dateBlocks = await BlockedPeriod.findAll({ where: { date }, transaction: t });
+      if (dateBlocks.some((block) => !block.start_time || !block.end_time || (startMinutes < parseTime(block.end_time) && endMinutes > parseTime(block.start_time)))) {
+        throw Object.assign(new Error('The selected time overlaps a blocked period'), { statusCode: 409 });
+      }
+
       // Check for overlapping bookings with locking
       const overlapping = await Appointment.findOne({
         where: {
@@ -95,7 +112,10 @@ async function cancelAppointment(appointmentId, userId, isAdmin = false) {
 
   // Check cancellation policy (6 hours before)
   if (!isAdmin) {
-    const appointmentDateTime = new Date(`${appointment.date}T${appointment.start_time}`);
+    const appointmentDay = parseDateOnly(appointment.date);
+    const [hour, minute] = appointment.start_time.split(':').map(Number);
+    appointmentDay.setHours(hour, minute, 0, 0);
+    const appointmentDateTime = appointmentDay;
     const now = new Date();
     const hoursUntil = (appointmentDateTime - now) / (1000 * 60 * 60);
 
@@ -115,6 +135,8 @@ async function cancelAppointment(appointmentId, userId, isAdmin = false) {
  * Reschedule an appointment to a new date/time
  */
 async function rescheduleAppointment(appointmentId, userId, newDate, newStartTime, isAdmin = false) {
+  validateDate(newDate);
+  validateTime(newStartTime);
   const appointment = await Appointment.findByPk(appointmentId, {
     include: [
       { model: Service, as: 'service' },
@@ -138,10 +160,24 @@ async function rescheduleAppointment(appointmentId, userId, newDate, newStartTim
   const startMinutes = parseTime(newStartTime);
   const endMinutes = startMinutes + service.duration;
   const endTime = formatTime(endMinutes);
+  await validateSlot(newDate, startMinutes, endMinutes);
 
   const result = await sequelize.transaction(
     { isolationLevel: 'SERIALIZABLE' },
     async (t) => {
+      const dayLock = await WorkingHours.findOne({
+        where: { day_of_week: parseDateOnly(newDate).getDay() },
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      if (!dayLock || !dayLock.is_active) {
+        throw Object.assign(new Error('The business is closed on the selected date'), { statusCode: 400 });
+      }
+      const dateBlocks = await BlockedPeriod.findAll({ where: { date: newDate }, transaction: t });
+      if (dateBlocks.some((block) => !block.start_time || !block.end_time || (startMinutes < parseTime(block.end_time) && endMinutes > parseTime(block.start_time)))) {
+        throw Object.assign(new Error('The selected time overlaps a blocked period'), { statusCode: 409 });
+      }
+
       // Check for overlapping bookings at the new time
       const overlapping = await Appointment.findOne({
         where: {
@@ -173,6 +209,10 @@ async function rescheduleAppointment(appointmentId, userId, newDate, newStartTim
     }
   );
 
+  await result.reload({ include: [
+    { model: Service, as: 'service' },
+    { model: User, as: 'customer', attributes: { exclude: ['password_hash'] } },
+  ] });
   return result;
 }
 
@@ -180,7 +220,7 @@ async function rescheduleAppointment(appointmentId, userId, newDate, newStartTim
  * Get upcoming appointments for a customer
  */
 async function getUpcomingAppointments(customerId) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatLocalDate(new Date());
 
   return Appointment.findAll({
     where: {
@@ -205,7 +245,7 @@ async function getUpcomingAppointments(customerId) {
  * Get appointment history for a customer
  */
 async function getAppointmentHistory(customerId) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatLocalDate(new Date());
 
   return Appointment.findAll({
     where: {
@@ -229,6 +269,64 @@ async function getAppointmentHistory(customerId) {
     ],
     order: [['date', 'DESC'], ['start_time', 'DESC']],
   });
+}
+
+function formatLocalDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function validateDate(date, { allowPast = false } = {}) {
+  if (date instanceof Date && !Number.isNaN(date.getTime())) {
+    date = formatLocalDate(date);
+  }
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw Object.assign(new Error('A valid date (YYYY-MM-DD) is required'), { statusCode: 400 });
+  }
+  const parsed = parseDateOnly(date);
+  if (Number.isNaN(parsed.getTime()) || formatLocalDate(parsed) !== date) {
+    throw Object.assign(new Error('A valid calendar date is required'), { statusCode: 400 });
+  }
+  if (!allowPast && parsed < new Date(new Date().setHours(0, 0, 0, 0))) {
+    throw Object.assign(new Error('Appointments must be booked for a valid date today or later'), { statusCode: 400 });
+  }
+}
+
+function validateTime(time) {
+  if (typeof time !== 'string' || !/^\d{2}:\d{2}$/.test(time)) {
+    throw Object.assign(new Error('A valid appointment time (HH:MM) is required'), { statusCode: 400 });
+  }
+  const [hour, minute] = time.split(':').map(Number);
+  if (hour > 23 || minute > 59) {
+    throw Object.assign(new Error('A valid appointment time (HH:MM) is required'), { statusCode: 400 });
+  }
+}
+
+async function validateSlot(date, startMinutes, endMinutes) {
+  const parsedDate = parseDateOnly(date);
+  const workingHours = await WorkingHours.findOne({ where: { day_of_week: parsedDate.getDay() } });
+  if (!workingHours || !workingHours.is_active) {
+    throw Object.assign(new Error('The business is closed on the selected date'), { statusCode: 400 });
+  }
+
+  const openMinutes = parseTime(workingHours.open_time);
+  const closeMinutes = parseTime(workingHours.close_time);
+  if (startMinutes < openMinutes || endMinutes > closeMinutes) {
+    throw Object.assign(new Error('The appointment must fit within business working hours'), { statusCode: 400 });
+  }
+
+  const blockedPeriods = await BlockedPeriod.findAll({ where: { date } });
+  const blocked = blockedPeriods.some((period) => {
+    if (!period.start_time || !period.end_time) return true;
+    return startMinutes < parseTime(period.end_time) && endMinutes > parseTime(period.start_time);
+  });
+  if (blocked) {
+    throw Object.assign(new Error('The selected time overlaps a blocked period'), { statusCode: 409 });
+  }
+
+  const current = new Date();
+  if (date === formatLocalDate(current) && startMinutes <= current.getHours() * 60 + current.getMinutes()) {
+    throw Object.assign(new Error('The selected appointment time has already passed'), { statusCode: 400 });
+  }
 }
 
 module.exports = {

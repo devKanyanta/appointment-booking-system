@@ -9,6 +9,7 @@ const testDb = new Sequelize(
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     dialect: 'postgres',
+    dialectOptions: process.env.DB_SOCKET_PATH ? { host: process.env.DB_SOCKET_PATH } : {},
     logging: false, // Suppress SQL logs during tests
     pool: {
       max: 5,

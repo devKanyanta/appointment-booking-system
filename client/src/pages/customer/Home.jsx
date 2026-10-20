@@ -9,7 +9,9 @@ export default function Home() {
   const [services, setServices] = useState([]);
 
   useEffect(() => {
-    api.get('/services').then((res) => setServices(res.data.services.slice(0, 4)));
+    api.get('/services')
+      .then((res) => setServices(res.data.data.slice(0, 4)))
+      .catch(() => setServices([]));
   }, []);
 
   return (

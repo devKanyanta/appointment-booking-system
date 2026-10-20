@@ -16,7 +16,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     api.get('/appointments/upcoming')
-      .then((res) => setAppointments(res.data.appointments))
+      .then((res) => setAppointments(res.data.data))
+      .catch(() => setAppointments([]))
       .finally(() => setLoading(false));
   }, []);
 

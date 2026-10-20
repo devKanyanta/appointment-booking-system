@@ -33,7 +33,7 @@ export default function AdminAppointments() {
     try {
       const params = statusFilter !== 'all' ? `?status=${statusFilter}` : '';
       const res = await api.get(`/admin/appointments${params}`);
-      setAppointments(res.data.appointments);
+      setAppointments(res.data.data);
     } catch {
       showError('Failed to load appointments');
     } finally {

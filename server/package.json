@@ -7,10 +7,11 @@
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
     "test": "jest --forceExit --detectOpenHandles",
-    "migrate": "npx sequelize-cli db:migrate",
-    "migrate:undo": "npx sequelize-cli db:migrate:undo:all",
-    "seed": "npx sequelize-cli db:seed:all",
-    "seed:undo": "npx sequelize-cli db:seed:undo:all"
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo:all",
+    "seed": "sequelize-cli db:seed:all",
+    "seed:undo": "sequelize-cli db:seed:undo:all",
+    "db:setup": "npm run migrate && npm run seed"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -34,7 +35,11 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "roots": ["<rootDir>/tests"],
-    "testMatch": ["**/*.test.js"]
+    "roots": [
+      "<rootDir>/tests"
+    ],
+    "testMatch": [
+      "**/*.test.js"
+    ]
   }
 }

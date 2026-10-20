@@ -8,8 +8,9 @@
     "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "install:all": "cd server && npm install && cd ../client && npm install",
-    "migrate": "cd server && npx sequelize-cli db:migrate",
-    "seed": "cd server && npx sequelize-cli db:seed:all",
+    "migrate": "npm --prefix server run migrate",
+    "seed": "npm --prefix server run seed",
+    "db:setup": "npm --prefix server run db:setup",
     "test": "cd server && npm test",
     "build": "cd client && npm run build"
   },
